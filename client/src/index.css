@@ -1,0 +1,65 @@
+@import "tailwindcss" source("./");
+
+@theme {
+  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Ink — structural navy, used for nav, headings, text on paper */
+  --color-ink-950: #131b30;
+  --color-ink-900: #1e2a44;
+  --color-ink-800: #283654;
+  --color-ink-700: #3a4a6b;
+  --color-ink-600: #55658a;
+  --color-ink-500: #7684a3;
+  --color-ink-300: #b7c0d4;
+  --color-ink-200: #d6dce8;
+  --color-ink-100: #e9ecf2;
+
+  /* Paper — warm, slightly cool-grey background, not the cliché cream */
+  --color-paper-50: #fbfaf7;
+  --color-paper-100: #f4f2ec;
+  --color-paper-200: #eae7dd;
+  --color-paper-300: #dbd6c8;
+
+  /* Brass — accent for primary actions, distinct from the typical terracotta */
+  --color-brass-400: #c7952f;
+  --color-brass-500: #b07f22;
+  --color-brass-600: #93691b;
+  --color-brass-100: #f3e6c8;
+
+  /* Status */
+  --color-moss-600: #3f6b4a;
+  --color-moss-100: #e2ebe1;
+  --color-brick-600: #a34331;
+  --color-brick-100: #f3e0da;
+  --color-amber-600: #a3721f;
+  --color-amber-100: #f2e6c9;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-paper-100);
+  color: var(--color-ink-900);
+}
+
+.font-display {
+  font-family: var(--font-serif);
+}
+
+.font-tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background-color: var(--color-brass-100);
+  color: var(--color-ink-950);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

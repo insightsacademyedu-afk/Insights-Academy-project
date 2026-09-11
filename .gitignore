@@ -1,0 +1,14 @@
+**/node_modules/
+**/.env
+**/.env.*
+!**/.env.example
+**/dist/
+**/coverage/
+backup/backups/
+backup/logs/
+*.log
+.cache/
+*.archive.gz
+*.archive.gz.json
+*.partial
+.connection-*/
