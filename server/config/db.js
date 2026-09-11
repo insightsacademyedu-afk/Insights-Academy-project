@@ -5,12 +5,18 @@ async function resolveAtlasSrvUri(uri) {
   if (!uri.startsWith("mongodb+srv://")) return uri;
 
   const parsed = new URL(uri.replace("mongodb+srv://", "mongodb://"));
-  const srvName = `_mongodb._tcp.${parsed.hostname}`;
-  const [hosts, txtResponse] = await Promise.all([
-    dns.promises.resolveSrv(srvName),
-    fetch(`https://dns.google/resolve?name=${parsed.hostname}&type=TXT`).then((response) => response.json()),
+  const resolveDnsOverHttps = (name, type) =>
+    fetch(`https://dns.google/resolve?name=${name}&type=${type}`).then((response) => response.json());
+  const [srvResponse, txtResponse] = await Promise.all([
+    resolveDnsOverHttps(`_mongodb._tcp.${parsed.hostname}`, "SRV"),
+    resolveDnsOverHttps(parsed.hostname, "TXT"),
   ]);
 
+  const hosts = srvResponse.Answer?.filter((answer) => answer.type === 33).map((answer) => {
+    const [, , port, name] = answer.data.split(" ");
+    return { name: name.replace(/\.$/, ""), port };
+  }) || [];
+  if (!hosts.length) throw new Error(`No MongoDB SRV records found for ${parsed.hostname}`);
   const txt = txtResponse.Answer?.find((answer) => answer.type === 16)?.data?.replace(/^"|"$/g, "");
   const options = new URLSearchParams(parsed.search);
   if (txt) {
