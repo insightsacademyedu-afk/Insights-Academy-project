@@ -9,6 +9,14 @@ Start two PowerShell terminals from this folder:
 
 Open http://localhost:5173/ and refresh with Ctrl+F5. My account is available to admin and staff. Currency is PKR.
 
+## One-click startup on Windows
+
+After Node.js 22.12 or newer is installed and the dependencies and private `.env` files are configured, double-click `start-local.ps1`. It opens separate backend and frontend windows, waits for both services, and opens the application at `http://localhost:5173/`. VS Code is not required.
+
+If Windows blocks the script, right-click it, choose **Properties**, select **Unblock**, and click **Apply**. The script uses PowerShell's temporary execution-policy bypass and does not change the machine policy.
+
+The backend still needs a working MongoDB Atlas connection. Add the computer's current public IP to Atlas **Network Access**, or use a local MongoDB replica set. The computer must remain connected to the network while the app is running.
+
 This machine requires DNS_SERVERS in the private server/.env for Atlas SRV lookup; the previous project's resolver settings were restored there. Database credentials were preserved. client/.env uses VITE_API_URL=/api and Vite proxies to port 5000.
 
 The older workspace ZIP predates the follow-up changes. Use this directory as your working copy.
