@@ -7,7 +7,6 @@ import Expense from "../models/Expense.js";
 import SalaryPayment from "../models/SalaryPayment.js";
 import TestResult from "../models/TestResult.js";
 import Test from "../models/Test.js";
-import Notification from "../models/Notification.js";
 import { isTeacherAuthorizedFor, getTeacherClassSectionPairs, buildStudentAssignmentFilterFromPairs } from "../utils/teacherScope.js";
 import StudentClassAssignment from "../models/StudentClassAssignment.js";
 
@@ -20,7 +19,7 @@ export async function adminSummary(req, res, next) {
     const { academicSession } = req.query;
     if (academicSession && !mongoose.isValidObjectId(academicSession)) return res.status(400).json({ message: "Invalid academicSession id" });
 
-    const [studentCounts, staffCounts, feeAgg, expenseAgg, salaryAgg, notificationCounts] = await Promise.all([
+    const [studentCounts, staffCounts, feeAgg, expenseAgg, salaryAgg] = await Promise.all([
       Student.aggregate([{ $match: { archivedAt: null } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
       Staff.aggregate([{ $match: { archivedAt: null } }, { $group: { _id: "$status", count: { $sum: 1 } } }]),
       FeeInvoice.aggregate([
@@ -54,7 +53,6 @@ export async function adminSummary(req, res, next) {
       SalaryPayment.aggregate([
         { $group: { _id: "$status", total: { $sum: "$netAmount" }, count: { $sum: 1 } } },
       ]),
-      Notification.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
     ]);
 
     res.json({
@@ -70,7 +68,6 @@ export async function adminSummary(req, res, next) {
         : { totalBilled: 0, totalCollected: 0, outstanding: 0, invoiceCount: 0 },
       expenses: expenseAgg[0] ? { ...expenseAgg[0], totalExpenses: sumMoney(expenseAgg[0].totalExpenses) } : { totalExpenses: 0, count: 0 },
       salaries: shapeStatusCounts(salaryAgg.map(row => ({ ...row, total: sumMoney(row.total) })), "total"),
-      notifications: shapeStatusCounts(notificationCounts),
     });
   } catch (err) {
     next(err);

@@ -295,7 +295,7 @@ const EMPTY_ADMIN_FORM = {
   subject: "",
   title: "",
   maxMarks: "",
-  passingMarks: "0",
+  passingMarks: "",
   testDate: "",
 };
 
@@ -303,7 +303,7 @@ const EMPTY_TEACHER_FORM = {
   assignmentId: "",
   title: "",
   maxMarks: "",
-  passingMarks: "0",
+  passingMarks: "",
   testDate: "",
 };
 

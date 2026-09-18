@@ -104,6 +104,37 @@ describe("Phase 5 — Fees module", () => {
     expect(await FeeInvoice.countDocuments({ period: "2026-03" })).toBe(2);
   });
 
+  test("bulk-generating exam fees supports a shared amount for the whole class/section", async () => {
+    const { agent, csrfToken } = await createAdminSession(app);
+    const chain = await createAcademicChain();
+    await createEnrolledStudent(chain, { rollNumber: "1", admissionNumber: "ADM-EXAM-1" });
+    await createEnrolledStudent(chain, { rollNumber: "2", admissionNumber: "ADM-EXAM-2" });
+
+    const payload = {
+      class: chain.klass._id,
+      section: chain.section._id,
+      academicSession: chain.session._id,
+      period: "Annual Exam 2026",
+      dueDate: futureDueDate(),
+      invoiceType: "exam",
+      amountOverride: 1500,
+    };
+
+    const first = await withCsrf(agent.post("/api/fees/invoices/bulk-generate").send(payload), csrfToken);
+    expect(first.status).toBe(201);
+    expect(first.body.createdCount).toBe(2);
+    expect(first.body.created).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ invoiceType: "exam", examFee: 1500, monthlyTuition: 0, totalAmount: 1500 }),
+      ])
+    );
+
+    const second = await withCsrf(agent.post("/api/fees/invoices/bulk-generate").send(payload), csrfToken);
+    expect(second.status).toBe(201);
+    expect(second.body.createdCount).toBe(0);
+    expect(second.body.skippedCount).toBe(2);
+  });
+
   test("recording a payment smaller than the total sets status to partially_paid; paying the remainder sets it to paid", async () => {
     const { agent, csrfToken } = await createAdminSession(app);
     const chain = await createAcademicChain();

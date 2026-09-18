@@ -22,6 +22,11 @@ export const salariesApi = {
   create(body) {
     return api.post("/salaries", body).then((r) => r.data);
   },
+  // POST /salaries/bulk-generate — creates one pending record for each
+  // active staff member and skips records already present for the period.
+  bulkGenerate(body) {
+    return api.post("/salaries/bulk-generate", body).then((r) => r.data);
+  },
   // POST /salaries/:id/mark-paid — { expenseCategory } (required — the
   // linked Expense needs a category to file under). Returns
   // { salary, expense }, both already reflecting the paid state. Runs

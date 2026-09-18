@@ -2,9 +2,11 @@ import { NavLink } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { NAV_SECTIONS, CURRENT_PHASE } from "../lib/nav";
 import { useAuth } from "../context/AuthContext";
+import { useAcademy } from "../context/academy";
 
 export default function Sidebar() {
   const { user } = useAuth();
+  const { settings } = useAcademy();
 
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col bg-ink-950 text-paper-100">
@@ -21,7 +23,7 @@ export default function Sidebar() {
         </svg>
         <div>
           <div className="font-display text-lg leading-tight">Ledger</div>
-          <div className="text-[11px] text-ink-300 leading-tight">Academy Management</div>
+          <div className="max-w-40 truncate text-[11px] text-ink-300 leading-tight" title={settings.academyName}>{settings.academyName}</div>
         </div>
       </div>
 
@@ -78,7 +80,7 @@ export default function Sidebar() {
       </nav>
 
       <div className="px-6 py-4 border-t border-ink-800 text-[11px] text-ink-500">
-        Academy Management
+        {settings.academyPhone || settings.academyName}
       </div>
     </aside>
   );

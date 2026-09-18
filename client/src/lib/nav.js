@@ -11,7 +11,6 @@ import {
   Wallet,
   ClipboardList,
   Receipt,
-  Bell,
   FileBarChart,
 } from "lucide-react";
 
@@ -53,13 +52,7 @@ export const NAV_SECTIONS = [
     label: "Academics",
     items: [{ to: "/tests", label: "Tests & Results", icon: ClipboardList, phase: 6, adminOnly: false }],
   },
-  {
-    label: "Comms & Reports",
-    items: [
-      { to: "/notifications", label: "Notifications", icon: Bell, phase: 8, adminOnly: false },
-      { to: "/reports", label: "Reports", icon: FileBarChart, phase: 9, adminOnly: true },
-    ],
-  },
+  { label: "Reports", items: [{ to: "/reports", label: "Reports", icon: FileBarChart, phase: 9, adminOnly: true }] },
 ];
 
 export const CURRENT_PHASE = 9;

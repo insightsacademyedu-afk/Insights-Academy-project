@@ -42,7 +42,7 @@ vi.mock("../api/fees", () => ({
 
 import { feesApi } from "../api/fees";
 import { studentsApi } from "../api/students";
-import { academicSessionsApi } from "../api/academicSetup";
+import { academicSessionsApi, classesApi, sectionsApi } from "../api/academicSetup";
 
 const SESSION = { _id: "sess1", name: "2026", isCurrent: true };
 
@@ -103,6 +103,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockUseAuth.mockReturnValue({ user: { role: "admin", _id: "admin1" }, isAdmin: true });
   academicSessionsApi.list.mockResolvedValue({ items: [SESSION] });
+  classesApi.list.mockResolvedValue({ items: [{ _id: "class1", name: "Class 1" }] });
+  sectionsApi.list.mockResolvedValue({ items: [{ _id: "section1", name: "A" }] });
   feesApi.listInvoices.mockResolvedValue({
     items: [UNPAID_INVOICE, WAIVED_INVOICE],
     page: 1,
@@ -192,6 +194,38 @@ describe("New invoice modal", () => {
     const body = feesApi.createInvoice.mock.calls[0][0];
     expect(body.student).toBe("stu1");
     expect(body.overrides).toEqual({ monthlyTuition: "3500" });
+  });
+});
+
+describe("Bulk invoice generation", () => {
+  it("generates an exam fee with a shared amount for the selected class", async () => {
+    const user = userEvent.setup();
+    feesApi.bulkGenerateInvoices.mockResolvedValue({ createdCount: 2, skippedCount: 0, created: [], skipped: [] });
+    renderFees();
+    await screen.findByText("Amina Khan");
+
+    await user.click(screen.getByRole("button", { name: /bulk generate/i }));
+    await user.selectOptions(screen.getByLabelText("Academic session *"), "sess1");
+    await waitFor(() => expect(classesApi.list).toHaveBeenCalled());
+    await user.selectOptions(screen.getByLabelText("Class *"), "class1");
+    await waitFor(() => expect(sectionsApi.list).toHaveBeenCalled());
+    await user.selectOptions(screen.getByLabelText("Section *"), "section1");
+    await user.selectOptions(screen.getByLabelText("Invoice type *"), "exam");
+    await user.type(screen.getByLabelText("Amount for each student"), "1500");
+    await user.type(screen.getByPlaceholderText("e.g. 2026-01"), "Annual Exam 2026");
+    await user.type(document.querySelector('input[type="date"]'), "2026-06-01");
+    await user.click(screen.getByRole("button", { name: /^generate$/i }));
+
+    await waitFor(() => expect(feesApi.bulkGenerateInvoices).toHaveBeenCalledTimes(1));
+    expect(feesApi.bulkGenerateInvoices).toHaveBeenCalledWith({
+      academicSession: "sess1",
+      class: "class1",
+      section: "section1",
+      invoiceType: "exam",
+      amountOverride: "1500",
+      period: "Annual Exam 2026",
+      dueDate: "2026-06-01",
+    });
   });
 });
 

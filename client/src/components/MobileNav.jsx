@@ -2,9 +2,11 @@ import { NavLink } from "react-router-dom";
 import { X, Lock } from "lucide-react";
 import { NAV_SECTIONS, CURRENT_PHASE } from "../lib/nav";
 import { useAuth } from "../context/AuthContext";
+import { useAcademy } from "../context/academy";
 
 export default function MobileNav({ open, onClose }) {
   const { user } = useAuth();
+  const { settings } = useAcademy();
   if (!open) return null;
 
   return (
@@ -12,7 +14,7 @@ export default function MobileNav({ open, onClose }) {
       <div className="absolute inset-0 bg-ink-950/40" onClick={onClose} />
       <div className="absolute left-0 top-0 h-full w-72 bg-ink-950 text-paper-100 overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-5 border-b border-ink-800">
-          <span className="font-display text-lg">Ledger</span>
+          <span className="max-w-56 truncate font-display text-lg">{settings.academyName}</span>
           <button onClick={onClose} aria-label="Close navigation">
             <X size={20} />
           </button>

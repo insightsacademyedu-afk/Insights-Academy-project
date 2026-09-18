@@ -4,8 +4,7 @@
 !**/.env.example
 **/dist/
 **/coverage/
-backup/backups/
-backup/logs/
+local-backups/
 *.log
 .cache/
 *.archive.gz

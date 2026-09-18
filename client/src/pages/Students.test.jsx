@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Students from "./Students";
@@ -104,6 +104,24 @@ describe("Students list — admin", () => {
     expect(screen.getByText("Tariq Khan")).toBeInTheDocument();
   });
 
+  it("filters the student list by class and then section", async () => {
+    const user = userEvent.setup();
+    renderStudents();
+    await screen.findByText("Amina Khan");
+
+    const classFilter = await screen.findByLabelText("Class filter");
+    await waitFor(() => expect(screen.getByRole("option", { name: "Class 9" })).toBeInTheDocument());
+    await user.selectOptions(classFilter, "class1");
+    await waitFor(() => expect(studentsApi.list).toHaveBeenCalledWith(expect.objectContaining({ class: "class1" })));
+
+    const sectionFilter = screen.getByLabelText("Section filter");
+    await waitFor(() => expect(screen.getByRole("option", { name: "A" })).toBeInTheDocument());
+    await user.selectOptions(sectionFilter, "sec1");
+    await waitFor(() =>
+      expect(studentsApi.list).toHaveBeenCalledWith(expect.objectContaining({ class: "class1", section: "sec1" }))
+    );
+  });
+
   it("surfaces a list-load error instead of silently showing an empty table", async () => {
     studentsApi.list.mockReset();
     studentsApi.list.mockRejectedValue(new Error("Network down"));
@@ -159,13 +177,13 @@ describe("New student form", () => {
     await screen.findByLabelText("Full name *");
 
     await userEvent.type(screen.getByLabelText("Full name *"), "New Student");
-    await userEvent.type(screen.getByLabelText("Admission number *"), "A-100");
     await userEvent.type(screen.getByLabelText("Date of birth *"), "2013-01-01");
     await userEvent.type(screen.getByLabelText("Guardian name *"), "Some Guardian");
     await userEvent.type(screen.getByLabelText("Primary phone *"), "0300-0000000");
-    // Enrollment session/class/section/roll number left entirely blank.
 
-    // The enrollment session/class/section/roll-number fields all carry a
+    // Enrollment class and section are left blank.
+
+    // The enrollment session/class/section fields all carry a
     // native HTML `required` attribute, so a real click on "Create &
     // enroll" would trip the browser's own constraint validation on those
     // before handleSubmit's own JS check ever ran — the same trap
@@ -175,7 +193,7 @@ describe("New student form", () => {
     fireEvent.submit(submitButton(/create & enroll/i).closest("form"));
 
     expect(
-      await screen.findByText("Session, class, section and roll number are all required to enroll a new student.")
+      await screen.findByText("Session, class and section are all required to enroll a new student.")
     ).toBeInTheDocument();
     expect(studentsApi.create).not.toHaveBeenCalled();
   });
@@ -189,17 +207,20 @@ describe("New student form", () => {
     await screen.findByLabelText("Full name *");
 
     await userEvent.type(screen.getByLabelText("Full name *"), "New Student");
-    await userEvent.type(screen.getByLabelText("Admission number *"), "A-100");
     await userEvent.type(screen.getByLabelText("Date of birth *"), "2013-01-01");
     await userEvent.type(screen.getByLabelText("Guardian name *"), "Some Guardian");
     await userEvent.type(screen.getByLabelText("Primary phone *"), "0300-0000000");
 
+    const monthlyTuition = screen.getByLabelText("Monthly tuition");
+    expect(monthlyTuition).toHaveValue(null);
+    await userEvent.type(monthlyTuition, "4000");
+    expect(monthlyTuition).toHaveValue(4000);
+
     // Session defaults to the current session already, per
     // emptyStudentForm/StudentFormModal's own reset effect — only class,
-    // section and roll number need picking.
+    // and section need picking.
     await userEvent.selectOptions(screen.getByLabelText("Class *"), "class1");
     await userEvent.selectOptions(screen.getByLabelText("Section *"), "sec1");
-    await userEvent.type(screen.getByLabelText("Roll number *"), "12");
 
     await userEvent.click(submitButton(/create & enroll/i));
 
@@ -207,12 +228,20 @@ describe("New student form", () => {
     const body = studentsApi.create.mock.calls[0][0];
     expect(body.fullName).toBe("New Student");
     expect(body.guardian).toMatchObject({ fullName: "Some Guardian", primaryPhone: "0300-0000000" });
+    expect(body.feeDetails).toMatchObject({
+      monthlyTuition: 4000,
+      admissionFee: 0,
+      examFee: 0,
+      otherFee: 0,
+      discount: 0,
+      scholarship: 0,
+    });
     expect(body.enrollment).toMatchObject({
       academicSession: "sess1",
       class: "class1",
       section: "sec1",
-      rollNumber: "12",
     });
+    expect(body.admissionNumber).toBe("");
   });
 });
 
@@ -247,7 +276,7 @@ describe("Edit student", () => {
 });
 
 describe("Enroll / transfer", () => {
-  it("submits the picked session/class/section/roll number to the enroll endpoint", async () => {
+  it("submits the picked session/class/section and lets the server assign the roll number", async () => {
     studentsApi.enroll.mockResolvedValue({});
     renderStudents();
     await screen.findByText("Amina Khan");
@@ -257,7 +286,6 @@ describe("Enroll / transfer", () => {
 
     await userEvent.selectOptions(screen.getByLabelText("Class *"), "class1");
     await userEvent.selectOptions(screen.getByLabelText("Section *"), "sec1");
-    await userEvent.type(screen.getByLabelText("Roll number *"), "7");
 
     await userEvent.click(screen.getByRole("button", { name: /^enroll$/i }));
 
@@ -265,7 +293,6 @@ describe("Enroll / transfer", () => {
       academicSession: "sess1",
       class: "class1",
       section: "sec1",
-      rollNumber: "7",
     });
   });
 });

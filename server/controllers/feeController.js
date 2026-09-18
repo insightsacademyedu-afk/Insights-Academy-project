@@ -7,6 +7,22 @@ import StudentClassAssignment from "../models/StudentClassAssignment.js";
 import { buildListQuery, paginatedResponse } from "../utils/listQuery.js";
 import { nextReceiptNumber } from "../utils/counters.js";
 
+const INVOICE_TYPES = ["tuition", "admission", "exam", "other"];
+const TYPE_AMOUNT_FIELDS = { admission: "admissionFee", exam: "examFee", other: "otherFee" };
+
+function invoiceFieldsFor(student, type, amountOverride) {
+  const fields = { monthlyTuition: 0, admissionFee: 0, examFee: 0, otherFee: 0, discount: 0, scholarship: 0 };
+  if (type === "tuition") {
+    fields.monthlyTuition = amountOverride ?? student.feeDetails.monthlyTuition;
+    fields.discount = student.feeDetails.discount;
+    fields.scholarship = student.feeDetails.scholarship;
+  } else {
+    const field = TYPE_AMOUNT_FIELDS[type];
+    fields[field] = amountOverride ?? student.feeDetails[field];
+  }
+  return fields;
+}
+
 // Fees is an admin-only module end to end (per spec, financial data is
 // explicitly excluded from what teachers can see — see shapeForRole in
 // studentController.js) so there is no teacher-scoping logic here at all.
@@ -54,10 +70,9 @@ export async function createInvoice(req, res, next) {
     const student = await Student.findOne({ _id: studentId, archivedAt: null });
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    const type = invoiceType || 'tuition';
-    const defaults = { monthlyTuition: 0, admissionFee: 0, examFee: 0, otherFee: 0, discount: 0, scholarship: 0 };
-    if (type === 'tuition') Object.assign(defaults, { monthlyTuition: student.feeDetails.monthlyTuition, discount: student.feeDetails.discount, scholarship: student.feeDetails.scholarship });
-    else { const key = { admission: 'admissionFee', exam: 'examFee', other: 'otherFee' }[type]; if (key) defaults[key] = student.feeDetails[key]; }
+    const type = invoiceType || "tuition";
+    if (!INVOICE_TYPES.includes(type)) return res.status(400).json({ message: "Invalid invoice type" });
+    const defaults = invoiceFieldsFor(student, type);
     const fields = {
       monthlyTuition: overrides.monthlyTuition ?? defaults.monthlyTuition,
       admissionFee: overrides.admissionFee ?? defaults.admissionFee,
@@ -102,9 +117,15 @@ export async function createInvoice(req, res, next) {
 // period, and reports what happened so the admin can see partial results.
 export async function bulkGenerateTuitionInvoices(req, res, next) {
   try {
-    const { class: classId, section, academicSession, period, dueDate } = req.body;
+    const { class: classId, section, academicSession, period, dueDate, invoiceType = "tuition", amountOverride } = req.body;
     if (!classId || !section || !academicSession || !period || !dueDate) {
       return res.status(400).json({ message: "class, section, academicSession, period and dueDate are required" });
+    }
+    if (!INVOICE_TYPES.includes(invoiceType)) return res.status(400).json({ message: "Invalid invoice type" });
+    const hasAmountOverride = amountOverride !== undefined && amountOverride !== "";
+    const overrideAmount = hasAmountOverride ? Number(amountOverride) : undefined;
+    if (hasAmountOverride && (!Number.isFinite(overrideAmount) || overrideAmount < 0)) {
+      return res.status(400).json({ message: "Amount must be a valid number of 0 or more" });
     }
 
     const assignments = await StudentClassAssignment.find({
@@ -125,14 +146,14 @@ export async function bulkGenerateTuitionInvoices(req, res, next) {
         continue;
       }
 
-      const fields = { monthlyTuition: student.feeDetails.monthlyTuition, discount: student.feeDetails.discount, scholarship: student.feeDetails.scholarship, admissionFee: 0, examFee: 0, otherFee: 0 };
+      const fields = invoiceFieldsFor(student, invoiceType, overrideAmount);
 
       try {
         const invoice = new FeeInvoice({
           student: student._id,
           academicSession,
           period,
-          invoiceType: "tuition",
+          invoiceType,
           dueDate,
           ...fields,
           totalAmount: computeInvoiceTotal(fields),
@@ -142,7 +163,7 @@ export async function bulkGenerateTuitionInvoices(req, res, next) {
         created.push(invoice);
       } catch (err) {
         if (err.code === 11000) {
-          skipped.push({ student: student._id, reason: "invoice already exists for this period" });
+          skipped.push({ student: student._id, reason: `${invoiceType} invoice already exists for this period` });
         } else {
           throw err;
         }
@@ -157,7 +178,7 @@ export async function bulkGenerateTuitionInvoices(req, res, next) {
 
 // Records a payment against an invoice, transactionally updating the
 // invoice's amountPaid/status so the two can never drift apart. Requires
-// a replica-set MongoDB (Atlas is one by default).
+// a replica-set MongoDB.
 export async function recordPayment(req, res, next) {
   let session;
   try {

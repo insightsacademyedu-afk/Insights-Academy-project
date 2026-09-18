@@ -6,7 +6,7 @@ import api from "./client";
 // of the four handlers call `buildListQuery`'s `skip`/`limit`, they return
 // every matching row in one response. Fine at small-school data volumes
 // (same reasoning already used elsewhere in this app, e.g. the "Specific
-// staff" picker in Phase 8's Notifications), but it does mean this module
+// staff pickers elsewhere), but it does mean this module
 // is plain `api.get()` calls rather than a `createResourceApi`/
 // `useResourceList` pairing, same as `api/dashboard.js`.
 

@@ -50,7 +50,7 @@ const EMPTY_STAFF_FORM = {
   phone: "",
   email: "",
   joiningDate: "",
-  basicSalary: 0,
+  basicSalary: "",
   salaryType: "monthly",
   status: "active",
 };
@@ -95,7 +95,7 @@ function StaffDirectory() {
       phone: row.phone || "",
       email: row.email || "",
       joiningDate: toDateInputValue(row.joiningDate),
-      basicSalary: row.basicSalary || 0,
+      basicSalary: row.basicSalary ? String(row.basicSalary) : "",
       salaryType: row.salaryType || "monthly",
       status: row.status,
     });
@@ -108,7 +108,11 @@ function StaffDirectory() {
     setSaving(true);
     setFormError("");
     try {
-      const payload = { ...form, designation: form.designation || null };
+      const payload = {
+        ...form,
+        designation: form.designation || null,
+        basicSalary: form.basicSalary === "" ? 0 : Number(form.basicSalary),
+      };
       if (editing) {
         await staffApi.update(editing._id, payload);
         toast.success("Staff profile updated");
@@ -318,7 +322,7 @@ function StaffDirectory() {
                 step="0.01"
                 min="0"
                 value={form.basicSalary}
-                onChange={(e) => setForm({ ...form, basicSalary: Number(e.target.value) })}
+                onChange={(e) => setForm({ ...form, basicSalary: e.target.value })}
               />
             </Field>
             <Field label="Salary type">

@@ -57,6 +57,55 @@ export async function create(req, res, next) {
   }
 }
 
+// Creates one pending salary record for every active staff member. Each
+// record snapshots that staff member's own basic salary, while optional
+// shared bonuses/deductions apply to the whole batch. Existing records for
+// the same period are reported as skipped rather than failing the run.
+export async function bulkGenerate(req, res, next) {
+  try {
+    const { period, bonuses = 0, deductions = 0, notes = "" } = req.body;
+    if (!period || !String(period).trim()) {
+      return res.status(400).json({ message: "period is required" });
+    }
+
+    const resolvedBonuses = bonuses === "" ? 0 : Number(bonuses);
+    const resolvedDeductions = deductions === "" ? 0 : Number(deductions);
+    if (!Number.isFinite(resolvedBonuses) || resolvedBonuses < 0 || !Number.isFinite(resolvedDeductions) || resolvedDeductions < 0) {
+      return res.status(400).json({ message: "Bonuses and deductions must be valid numbers of 0 or more" });
+    }
+
+    const staffMembers = await Staff.find({ status: "active", archivedAt: null }).sort({ fullName: 1 });
+    const attempts = await Promise.all(
+      staffMembers.map(async (staff) => {
+        try {
+          const salary = await SalaryPayment.create({
+            staff: staff._id,
+            period: String(period).trim(),
+            baseAmount: staff.basicSalary,
+            bonuses: resolvedBonuses,
+            deductions: resolvedDeductions,
+            netAmount: computeNetSalary({ baseAmount: staff.basicSalary, bonuses: resolvedBonuses, deductions: resolvedDeductions }),
+            notes,
+          });
+          return { salary };
+        } catch (error) {
+          if (error.code === 11000) {
+            return { skipped: { staff: staff._id, fullName: staff.fullName, reason: "salary record already exists for this period" } };
+          }
+          throw error;
+        }
+      })
+    );
+
+    const created = attempts.flatMap((attempt) => (attempt.salary ? [attempt.salary] : []));
+    const skipped = attempts.flatMap((attempt) => (attempt.skipped ? [attempt.skipped] : []));
+    res.status(201).json({ createdCount: created.length, skippedCount: skipped.length, created, skipped });
+  } catch (err) {
+    if (err.name === "ValidationError") return res.status(400).json({ message: err.message });
+    next(err);
+  }
+}
+
 // The critical piece: marking a salary "paid" and recording the
 // corresponding expense must succeed or fail together. If a crash or
 // error happened between the two writes without a transaction, you could

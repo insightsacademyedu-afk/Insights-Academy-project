@@ -29,7 +29,8 @@ export const feesApi = {
     return api.post("/fees/invoices", body).then((r) => r.data);
   },
   // POST /fees/invoices/bulk-generate — { class, section, academicSession,
-  // period, dueDate }. Returns { createdCount, skippedCount, created, skipped }
+  // period, dueDate, invoiceType, amountOverride? }. Returns
+  // { createdCount, skippedCount, created, skipped }
   // — students already invoiced for that period are skipped, not errored.
   bulkGenerateInvoices(body) {
     return api.post("/fees/invoices/bulk-generate", body).then((r) => r.data);

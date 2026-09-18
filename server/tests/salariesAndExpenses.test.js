@@ -9,7 +9,7 @@ async function makeStaff(overrides = {}) {
   return Staff.create({
     fullName: overrides.fullName || "Salaried Staff",
     basicSalary: overrides.basicSalary ?? 50000,
-    status: "active",
+    status: overrides.status || "active",
   });
 }
 
@@ -43,6 +43,41 @@ describe("Phase 7 — Expenses & Salaries", () => {
 
     const second = await withCsrf(agent.post("/api/salaries").send({ staff: staff._id, period: "2026-02" }), csrfToken);
     expect(second.status).toBe(409);
+  });
+
+  test("bulk salary generation uses each active staff member's salary and skips existing records", async () => {
+    const { agent, csrfToken } = await createAdminSession(app);
+    const first = await makeStaff({ fullName: "First Teacher", basicSalary: 30000 });
+    const second = await makeStaff({ fullName: "Second Teacher", basicSalary: 50000 });
+    const inactive = await makeStaff({ fullName: "Inactive Teacher", basicSalary: 70000, status: "inactive" });
+
+    await SalaryPayment.create({
+      staff: first._id,
+      period: "2026-08",
+      baseAmount: 30000,
+      bonuses: 0,
+      deductions: 0,
+      netAmount: 30000,
+    });
+
+    const response = await withCsrf(
+      agent.post("/api/salaries/bulk-generate").send({
+        period: "2026-08",
+        bonuses: 1000,
+        deductions: 500,
+        notes: "Monthly payroll",
+      }),
+      csrfToken
+    );
+
+    expect(response.status).toBe(201);
+    expect(response.body.createdCount).toBe(1);
+    expect(response.body.skippedCount).toBe(1);
+    expect(response.body.skipped[0]).toMatchObject({ fullName: "First Teacher" });
+
+    const secondSalary = await SalaryPayment.findOne({ staff: second._id, period: "2026-08" });
+    expect(secondSalary).toMatchObject({ baseAmount: 50000, bonuses: 1000, deductions: 500, netAmount: 50500 });
+    expect(await SalaryPayment.exists({ staff: inactive._id, period: "2026-08" })).toBeNull();
   });
 
   test("creating a salary record with a fake staff id is rejected with 404 (checked at controller level)", async () => {

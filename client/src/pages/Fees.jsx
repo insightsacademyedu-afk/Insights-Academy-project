@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Layers, Eye, X } from "lucide-react";
+import { Plus, Layers, Eye, X, Printer } from "lucide-react";
 import AppLayout from "../components/AppLayout";
 import DataTable from "../components/DataTable";
 import Pagination from "../components/Pagination";
@@ -12,6 +12,7 @@ import { studentsApi } from "../api/students";
 import { academicSessionsApi, classesApi, sectionsApi } from "../api/academicSetup";
 import { useResourceList } from "../lib/useResourceList";
 import { useToast } from "../context/ToastContext";
+import { useAcademy } from "../context/academy";
 import { formatCurrency, formatDate } from "../lib/format";
 
 // feesApi.listInvoices already returns the generic {items,...} shape, so
@@ -524,7 +525,15 @@ function InlineStudentPicker({ value, onChange }) {
   );
 }
 
-const EMPTY_BULK_FORM = { academicSession: "", class: "", section: "", period: "", dueDate: "" };
+const EMPTY_BULK_FORM = {
+  academicSession: "",
+  class: "",
+  section: "",
+  invoiceType: "tuition",
+  amountOverride: "",
+  period: "",
+  dueDate: "",
+};
 
 function BulkGenerateModal({ open, onClose, sessions, defaultSession, onDone }) {
   const toast = useToast();
@@ -587,7 +596,7 @@ function BulkGenerateModal({ open, onClose, sessions, defaultSession, onDone }) 
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title="Bulk generate tuition invoices">
+    <Modal open={open} onClose={handleClose} title="Bulk generate invoices">
       {!result ? (
         <form onSubmit={handleSubmit}>
           {error && (
@@ -596,8 +605,8 @@ function BulkGenerateModal({ open, onClose, sessions, defaultSession, onDone }) 
             </div>
           )}
           <p className="mb-4 text-xs text-ink-500">
-            Generates one tuition invoice per active student in the chosen class/section for the given
-            period. A student who already has an invoice for that period is skipped, not overwritten.
+            Generates one selected fee invoice per active student in the chosen class/section. Existing
+            invoices of the same type and period are skipped, not overwritten.
           </p>
 
           <Field label="Academic session" required>
@@ -651,6 +660,32 @@ function BulkGenerateModal({ open, onClose, sessions, defaultSession, onDone }) 
                   </option>
                 ))}
               </Select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Invoice type" required>
+              <Select
+                required
+                value={form.invoiceType}
+                onChange={(e) => setForm({ ...form, invoiceType: e.target.value })}
+              >
+                {INVOICE_TYPES.map((type) => (
+                  <option key={type} value={type} className="capitalize">
+                    {type}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Amount for each student">
+              <TextInput
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Use each student's fee"
+                value={form.amountOverride}
+                onChange={(e) => setForm({ ...form, amountOverride: e.target.value })}
+              />
             </Field>
           </div>
 
@@ -720,6 +755,7 @@ function BulkGenerateModal({ open, onClose, sessions, defaultSession, onDone }) 
 
 function InvoiceDetailModal({ invoiceRow, onClose, onChanged }) {
   const toast = useToast();
+  const { settings } = useAcademy();
   const [data, setData] = useState(null); // {invoice, payments}
   const [loading, setLoading] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -826,6 +862,7 @@ function InvoiceDetailModal({ invoiceRow, onClose, onChanged }) {
                     <th className="px-3 py-1.5 font-medium">Method</th>
                     <th className="px-3 py-1.5 font-medium">Date</th>
                     <th className="px-3 py-1.5 text-right font-medium">Amount</th>
+                    <th className="px-3 py-1.5 font-medium">Print</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -835,6 +872,7 @@ function InvoiceDetailModal({ invoiceRow, onClose, onChanged }) {
                       <td className="px-3 py-1.5 capitalize">{p.method.replace(/_/g, " ")}</td>
                       <td className="px-3 py-1.5">{formatDate(p.paidAt)}</td>
                       <td className="px-3 py-1.5 text-right font-tabular">{formatCurrency(p.amount)}</td>
+                      <td className="px-3 py-1.5"><button type="button" className="text-ink-600 hover:text-ink-950" aria-label={`Print receipt ${p.receiptNumber}`} onClick={() => printReceipt(p, invoice, settings)}><Printer size={15} /></button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -867,6 +905,34 @@ function InvoiceDetailModal({ invoiceRow, onClose, onChanged }) {
       )}
     </Modal>
   );
+}
+
+function printReceipt(payment, invoice, settings) {
+  const popup = window.open('', '_blank', 'width=520,height=700');
+  if (!popup) return;
+  const doc = popup.document;
+  doc.title = `Receipt ${payment.receiptNumber}`;
+  const style = doc.createElement('style');
+  style.textContent = 'body{font-family:Arial,sans-serif;color:#172033;padding:32px;max-width:520px;margin:auto}h1{text-align:center;margin:0 0 4px}p{text-align:center;margin:4px}.line{display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding:10px 0}.total{font-size:20px;font-weight:bold}.footer{margin-top:32px;border-top:1px solid #aaa;padding-top:16px;white-space:pre-wrap}@media print{body{padding:0}}';
+  doc.head.appendChild(style);
+  const add = (tag, text, className = '') => { const node = doc.createElement(tag); node.textContent = text; if (className) node.className = className; doc.body.appendChild(node); return node; };
+  add('h1', settings.receiptName || settings.academyName || 'Academy Management');
+  const phone = settings.receiptPhone || settings.academyPhone;
+  if (phone) add('p', phone);
+  add('p', `Payment receipt · ${payment.receiptNumber}`);
+  for (const [label, value, className] of [
+    ['Student', invoice.student?.fullName || ''],
+    ['Admission number', invoice.student?.admissionNumber || ''],
+    ['Invoice period', invoice.period],
+    ['Payment date', formatDate(payment.paidAt)],
+    ['Method', payment.method.replace(/_/g, ' ')],
+    ['Amount received', formatCurrency(payment.amount), 'total'],
+  ]) {
+    const row = add('div', '', `line ${className}`); const left = doc.createElement('span'); const right = doc.createElement('span');
+    left.textContent = label; right.textContent = value; row.append(left, right);
+  }
+  if (settings.receiptFooter) add('div', settings.receiptFooter, 'footer');
+  popup.focus(); popup.print();
 }
 
 // Marks the remaining balance as administratively excused rather than

@@ -8,11 +8,6 @@
     "start": "node server.js",
     "seed:admin": "node utils/seedAdmin.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
-    "backup": "node ../backup/backup.mjs",
-    "backup:verify": "node ../backup/verify-latest.mjs",
-    "backup:list": "node ../backup/restore.mjs --list",
-    "backup:check": "node ../backup/check-tools.mjs",
-    "backup:test": "node --test ../backup/tests/*.test.mjs",
     "check:syntax": "node ../scripts/check.mjs",
     "db:prepare": "node utils/prepareDatabase.js"
   },
@@ -27,8 +22,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.0",
-    "morgan": "^1.10.0",
-    "nodemailer": "^10.0.3"
+    "morgan": "^1.10.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",

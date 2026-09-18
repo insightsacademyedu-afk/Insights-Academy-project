@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
+import { AcademyProvider } from "./context/AcademyContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 const Account = lazy(() => import("./pages/Account"));
@@ -17,7 +18,6 @@ const Students = lazy(() => import("./pages/Students"));
 const Fees = lazy(() => import("./pages/Fees"));
 const Tests = lazy(() => import("./pages/Tests"));
 const Salaries = lazy(() => import("./pages/Salaries"));
-const Notifications = lazy(() => import("./pages/Notifications"));
 const Reports = lazy(() => import("./pages/Reports"));
 import { NAV_SECTIONS, CURRENT_PHASE } from "./lib/nav";
 
@@ -34,7 +34,6 @@ const LIVE_PAGES = {
   "/fees": Fees,
   "/tests": Tests,
   "/salaries": Salaries,
-  "/notifications": Notifications,
   "/reports": Reports,
 };
 
@@ -52,7 +51,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <ToastProvider>
+        <AcademyProvider><ToastProvider>
           <Suspense fallback={<p role="status" className="p-6">Loading…</p>}><Routes>
             <Route path="/login" element={<Login />} />
             <Route
@@ -90,7 +89,7 @@ export default function App() {
             ))}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes></Suspense>
-        </ToastProvider>
+        </ToastProvider></AcademyProvider>
       </AuthProvider>
     </BrowserRouter>
   );

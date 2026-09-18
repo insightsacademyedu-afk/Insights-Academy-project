@@ -1,6 +1,13 @@
 import dotenv from "dotenv";
+import dns from "node:dns";
 
 dotenv.config({ path: new URL("../.env", import.meta.url) });
+
+const dnsServers = String(process.env.DNS_SERVERS || "")
+  .split(",")
+  .map((server) => server.trim())
+  .filter(Boolean);
+if (dnsServers.length) dns.setServers(dnsServers);
 
 function required(name, fallback) {
   const value = process.env[name] ?? fallback;
@@ -35,7 +42,9 @@ function assertStrongJwtSecret(secret) {
 export const config = {
   nodeEnv: process.env.NODE_ENV || "development",
   isProd,
+  serveClient: isProd || process.env.SERVE_CLIENT === "true",
   port: Number(process.env.PORT) || 5000,
+  host: process.env.HOST || (isProd ? "0.0.0.0" : "127.0.0.1"),
   clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
 
   mongoUri: required("MONGO_URI"),
@@ -53,14 +62,4 @@ export const config = {
     password: process.env.SEED_ADMIN_PASSWORD || "ChangeThisPassword123!",
   },
 
-  // SMTP - works with any provider (Brevo's free tier is the recommended
-  // $0 option, see the deployment notes). Left unset in dev, in which case
-  // emailProvider.js reports a clean failure instead of throwing.
-  smtp: {
-    host: process.env.SMTP_HOST || "",
-    port: Number(process.env.SMTP_PORT) || 587,
-    user: process.env.SMTP_USER || "",
-    pass: process.env.SMTP_PASS || "",
-    fromAddress: process.env.SMTP_FROM || "no-reply@academy.local",
-  },
 };

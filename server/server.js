@@ -6,8 +6,8 @@ import mongoose from "mongoose";
 async function start() {
   await connectDB();
 
-  const server = app.listen(config.port, () => {
-    console.log(`[server] listening on port ${config.port} (${config.nodeEnv})`);
+  const server = app.listen(config.port, config.host, () => {
+    console.log(`[server] listening on ${config.host}:${config.port} (${config.nodeEnv})`);
   });
   for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => {
     const timer = setTimeout(() => process.exit(1), 10000);

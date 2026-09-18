@@ -18,7 +18,7 @@ const guardianSchema = new Schema(
 );
 
 // Speeds up "same phone number belongs to N students" dedup checks used
-// later by the notification system (Phase 8) to avoid duplicate sends.
+// separately so either contact method can still be recorded.
 guardianSchema.index({ primaryPhone: 1 });
 guardianSchema.index({ whatsappPhone: 1 });
 

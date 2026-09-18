@@ -26,10 +26,11 @@ import testRoutes from "./routes/testRoutes.js";
 import expenseCategoryRoutes from "./routes/expenseCategoryRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
 import salaryRoutes from "./routes/salaryRoutes.js";
-import notificationRoutes from "./routes/notificationRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import archiveRoutes from "./routes/archiveRoutes.js";
+import settingsRoutes from "./routes/settingsRoutes.js";
+import backupRoutes from "./routes/backupRoutes.js";
 
 const app = express();
 
@@ -46,7 +47,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(mongoSanitize()); // strips $/. operators from req.body/query/params
 
-if (!config.isProd) {
+if (!config.isProd && !config.serveClient) {
   app.use(morgan("dev"));
 }
 
@@ -73,13 +74,14 @@ app.use("/api/tests", testRoutes);
 app.use("/api/expense-categories", expenseCategoryRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/salaries", salaryRoutes);
-app.use("/api/notifications", notificationRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/archive", archiveRoutes);
+app.use("/api/settings", settingsRoutes);
+app.use("/api/backups", backupRoutes);
 
 const clientDist = fileURLToPath(new URL("../client/dist/", import.meta.url));
-if (config.isProd && existsSync(clientDist + "index.html")) {
+if (config.serveClient && existsSync(clientDist + "index.html")) {
   app.use(express.static(clientDist));
   app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => res.sendFile(clientDist + "index.html"));
 }

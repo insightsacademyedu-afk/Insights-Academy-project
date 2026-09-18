@@ -1,9 +1,9 @@
 @import "tailwindcss" source("./");
 
 @theme {
-  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-sans: "Segoe UI", Arial, sans-serif;
+  --font-mono: Consolas, "Courier New", monospace;
 
   /* Ink — structural navy, used for nav, headings, text on paper */
   --color-ink-950: #131b30;

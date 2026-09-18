@@ -6,7 +6,7 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 let count=0;
 function walk(dir) {
   for(const entry of readdirSync(dir,{withFileTypes:true})) {
-    if(['node_modules','dist','backups','logs'].includes(entry.name))continue;
+    if(['node_modules','dist','local-backups','logs'].includes(entry.name))continue;
     const path=resolve(dir,entry.name);
     if(entry.isDirectory())walk(path);
     else if(/\.(js|mjs)$/.test(entry.name)) {
@@ -16,5 +16,5 @@ function walk(dir) {
     }
   }
 }
-for(const dir of ['server','backup','scripts'])walk(resolve(root,dir));
+for(const dir of ['server','scripts'])walk(resolve(root,dir));
 console.log(`Syntax checks passed: ${count} JavaScript files`);

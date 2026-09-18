@@ -20,6 +20,7 @@ import { formatCurrency, formatDate, toDateInputValue } from "../lib/format";
 // hard-coded two-option status filter — the toolbar below is built by
 // hand, same as the teacher-assignments tab on the Staff page.
 const STUDENT_STATUSES = ["active", "inactive", "transferred", "graduated", "expelled"];
+const FEE_DETAIL_FIELDS = ["monthlyTuition", "admissionFee", "examFee", "otherFee", "discount", "scholarship"];
 
 function emptyStudentForm() {
   return {
@@ -34,12 +35,12 @@ function emptyStudentForm() {
     admissionDate: toDateInputValue(new Date()),
     status: "active",
     feeDetails: {
-      monthlyTuition: 0,
-      admissionFee: 0,
-      examFee: 0,
-      otherFee: 0,
-      discount: 0,
-      scholarship: 0,
+      monthlyTuition: "",
+      admissionFee: "",
+      examFee: "",
+      otherFee: "",
+      discount: "",
+      scholarship: "",
     },
     guardian: {
       fullName: "",
@@ -54,13 +55,21 @@ function emptyStudentForm() {
   };
 }
 
-const EMPTY_ENROLLMENT = { academicSession: "", class: "", section: "", rollNumber: "" };
+const EMPTY_ENROLLMENT = { academicSession: "", class: "", section: "" };
 
 export default function Students() {
   const { isAdmin } = useAuth();
   const toast = useToast();
   const [genderFilter, setGenderFilter] = useState("");
-  const list = useResourceList(studentsApi, genderFilter ? { gender: genderFilter } : {});
+  const [classFilter, setClassFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [filterClasses, setFilterClasses] = useState([]);
+  const [filterSections, setFilterSections] = useState([]);
+  const list = useResourceList(studentsApi, {
+    ...(genderFilter ? { gender: genderFilter } : {}),
+    ...(classFilter ? { class: classFilter } : {}),
+    ...(sectionFilter ? { section: sectionFilter } : {}),
+  });
 
   const [sessions, setSessions] = useState([]);
   useEffect(() => {
@@ -69,6 +78,23 @@ export default function Students() {
       .then((res) => setSessions(res.items))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin || sessions.length === 0) return;
+    const currentSession = sessions.find((session) => session.isCurrent);
+    classesApi
+      .list({ limit: 200, status: "active", ...(currentSession ? { academicSession: currentSession._id } : {}) })
+      .then((res) => setFilterClasses(res.items))
+      .catch(() => setFilterClasses([]));
+  }, [isAdmin, sessions]);
+
+  useEffect(() => {
+    if (!isAdmin || !classFilter) return;
+    sectionsApi
+      .list({ limit: 200, class: classFilter, status: "active" })
+      .then((res) => setFilterSections(res.items))
+      .catch(() => setFilterSections([]));
+  }, [classFilter, isAdmin]);
 
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -223,6 +249,38 @@ export default function Students() {
           <option value="other">Other</option>
         </select>
 
+        {isAdmin && (
+          <>
+            <select
+              aria-label="Class filter"
+              value={classFilter}
+              onChange={(e) => {
+                setClassFilter(e.target.value);
+                setSectionFilter("");
+              }}
+              className="rounded-md border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 outline-none focus:border-ink-700"
+            >
+              <option value="">All classes</option>
+              {filterClasses.map((item) => (
+                <option key={item._id} value={item._id}>{item.name}</option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Section filter"
+              value={sectionFilter}
+              disabled={!classFilter}
+              onChange={(e) => setSectionFilter(e.target.value)}
+              className="rounded-md border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 outline-none focus:border-ink-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="">All sections</option>
+              {filterSections.map((item) => (
+                <option key={item._id} value={item._id}>{item.name}</option>
+              ))}
+            </select>
+          </>
+        )}
+
         <div className="flex-1" />
 
         {isAdmin && (
@@ -332,15 +390,9 @@ function StudentFormModal({ open, onClose, editing, sessions, onSaved }) {
         phone: editing.phone || "",
         admissionDate: toDateInputValue(editing.admissionDate),
         status: editing.status,
-        feeDetails: {
-          monthlyTuition: 0,
-          admissionFee: 0,
-          examFee: 0,
-          otherFee: 0,
-          discount: 0,
-          scholarship: 0,
-          ...(editing.feeDetails || {}),
-        },
+        feeDetails: Object.fromEntries(
+          FEE_DETAIL_FIELDS.map((key) => [key, editing.feeDetails?.[key] ? String(editing.feeDetails[key]) : ""])
+        ),
         guardian: {
           fullName: editing.guardian?.fullName || "",
           relationship: editing.guardian?.relationship || "Father",
@@ -386,18 +438,24 @@ function StudentFormModal({ open, onClose, editing, sessions, onSaved }) {
     e.preventDefault();
     setError("");
 
-    if (!editing && (!enrollment.academicSession || !enrollment.class || !enrollment.section || !enrollment.rollNumber)) {
-      setError("Session, class, section and roll number are all required to enroll a new student.");
+    if (!editing && (!enrollment.academicSession || !enrollment.class || !enrollment.section)) {
+      setError("Session, class and section are all required to enroll a new student.");
       return;
     }
 
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        feeDetails: Object.fromEntries(
+          FEE_DETAIL_FIELDS.map((key) => [key, form.feeDetails[key] === "" ? 0 : Number(form.feeDetails[key])])
+        ),
+      };
       if (editing) {
-        await studentsApi.update(editing._id, form);
+        await studentsApi.update(editing._id, payload);
         toast.success("Student updated");
       } else {
-        await studentsApi.create({ ...form, enrollment });
+        await studentsApi.create({ ...payload, enrollment });
         toast.success("Student created and enrolled");
       }
       onSaved();
@@ -422,11 +480,10 @@ function StudentFormModal({ open, onClose, editing, sessions, onSaved }) {
           <Field label="Full name" required>
             <TextInput required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
           </Field>
-          <Field label="Admission number" required>
+          <Field label="Admission number">
             <TextInput
-              required
-              value={form.admissionNumber}
-              onChange={(e) => setForm({ ...form, admissionNumber: e.target.value })}
+              disabled
+              value={editing ? form.admissionNumber : "Assigned automatically"}
             />
           </Field>
         </div>
@@ -552,7 +609,7 @@ function StudentFormModal({ open, onClose, editing, sessions, onSaved }) {
               min="0"
               value={form.feeDetails.monthlyTuition}
               onChange={(e) =>
-                setForm({ ...form, feeDetails: { ...form.feeDetails, monthlyTuition: Number(e.target.value) } })
+                setForm({ ...form, feeDetails: { ...form.feeDetails, monthlyTuition: e.target.value } })
               }
             />
           </Field>
@@ -563,7 +620,7 @@ function StudentFormModal({ open, onClose, editing, sessions, onSaved }) {
               min="0"
               value={form.feeDetails.admissionFee}
               onChange={(e) =>
-                setForm({ ...form, feeDetails: { ...form.feeDetails, admissionFee: Number(e.target.value) } })
+                setForm({ ...form, feeDetails: { ...form.feeDetails, admissionFee: e.target.value } })
               }
             />
           </Field>
@@ -573,7 +630,7 @@ function StudentFormModal({ open, onClose, editing, sessions, onSaved }) {
               step="0.01"
               min="0"
               value={form.feeDetails.examFee}
-              onChange={(e) => setForm({ ...form, feeDetails: { ...form.feeDetails, examFee: Number(e.target.value) } })}
+              onChange={(e) => setForm({ ...form, feeDetails: { ...form.feeDetails, examFee: e.target.value } })}
             />
           </Field>
         </div>
@@ -584,7 +641,7 @@ function StudentFormModal({ open, onClose, editing, sessions, onSaved }) {
               step="0.01"
               min="0"
               value={form.feeDetails.otherFee}
-              onChange={(e) => setForm({ ...form, feeDetails: { ...form.feeDetails, otherFee: Number(e.target.value) } })}
+              onChange={(e) => setForm({ ...form, feeDetails: { ...form.feeDetails, otherFee: e.target.value } })}
             />
           </Field>
           <Field label="Discount">
@@ -593,7 +650,7 @@ function StudentFormModal({ open, onClose, editing, sessions, onSaved }) {
               step="0.01"
               min="0"
               value={form.feeDetails.discount}
-              onChange={(e) => setForm({ ...form, feeDetails: { ...form.feeDetails, discount: Number(e.target.value) } })}
+              onChange={(e) => setForm({ ...form, feeDetails: { ...form.feeDetails, discount: e.target.value } })}
             />
           </Field>
           <Field label="Scholarship">
@@ -603,7 +660,7 @@ function StudentFormModal({ open, onClose, editing, sessions, onSaved }) {
               min="0"
               value={form.feeDetails.scholarship}
               onChange={(e) =>
-                setForm({ ...form, feeDetails: { ...form.feeDetails, scholarship: Number(e.target.value) } })
+                setForm({ ...form, feeDetails: { ...form.feeDetails, scholarship: e.target.value } })
               }
             />
           </Field>
@@ -669,13 +726,7 @@ function StudentFormModal({ open, onClose, editing, sessions, onSaved }) {
                 </Select>
               </Field>
             </div>
-            <Field label="Roll number" required>
-              <TextInput
-                required
-                value={enrollment.rollNumber}
-                onChange={(e) => setEnrollment({ ...enrollment, rollNumber: e.target.value })}
-              />
-            </Field>
+            <p className="mb-4 text-xs text-ink-500">Admission and roll numbers are assigned automatically when the student is saved.</p>
           </>
         )}
 
@@ -802,9 +853,7 @@ function EnrollModal({ student, sessions, onClose, onSaved }) {
             </Select>
           </Field>
         </div>
-        <Field label="Roll number" required>
-          <TextInput required value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value })} />
-        </Field>
+        <p className="mb-4 text-xs text-ink-500">The next roll number for this class will be assigned automatically.</p>
 
         <div className="flex justify-end gap-2 mt-2">
           <Button type="button" variant="ghost" onClick={onClose}>

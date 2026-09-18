@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, CircleDollarSign } from "lucide-react";
+import { Plus, Pencil, Trash2, CircleDollarSign, Layers } from "lucide-react";
 import AppLayout from "../components/AppLayout";
 import DataTable from "../components/DataTable";
 import Pagination from "../components/Pagination";
@@ -82,6 +82,7 @@ function SalariesTab() {
   });
 
   const [newOpen, setNewOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [payTarget, setPayTarget] = useState(null); // salary row being marked paid
 
   const columns = [
@@ -162,6 +163,10 @@ function SalariesTab() {
 
         <div className="flex-1" />
 
+        <Button variant="ghost" onClick={() => setBulkOpen(true)}>
+          <Layers size={15} />
+          Bulk generate
+        </Button>
         <Button onClick={() => setNewOpen(true)}>
           <Plus size={15} />
           New salary record
@@ -192,6 +197,12 @@ function SalariesTab() {
         }}
       />
 
+      <BulkSalaryModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        onDone={() => list.refetch()}
+      />
+
       <MarkPaidModal
         salary={payTarget}
         onClose={() => setPayTarget(null)}
@@ -202,6 +213,130 @@ function SalariesTab() {
         }}
       />
     </>
+  );
+}
+
+const EMPTY_BULK_SALARY_FORM = { period: "", bonuses: "", deductions: "", notes: "" };
+
+function BulkSalaryModal({ open, onClose, onDone }) {
+  const toast = useToast();
+  const [form, setForm] = useState(EMPTY_BULK_SALARY_FORM);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm(EMPTY_BULK_SALARY_FORM);
+    setError("");
+    setResult(null);
+  }, [open]);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const response = await salariesApi.bulkGenerate({
+        period: form.period,
+        bonuses: form.bonuses === "" ? 0 : Number(form.bonuses),
+        deductions: form.deductions === "" ? 0 : Number(form.deductions),
+        notes: form.notes,
+      });
+      setResult(response);
+      onDone();
+      toast.success(`${response.createdCount} salary record(s) created, ${response.skippedCount} skipped`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleClose() {
+    setResult(null);
+    onClose();
+  }
+
+  return (
+    <Modal open={open} onClose={handleClose} title="Bulk generate salaries">
+      {!result ? (
+        <form onSubmit={handleSubmit}>
+          {error && (
+            <div className="mb-4 rounded-md border border-brick-600/30 bg-brick-100 px-3 py-2 text-sm text-brick-600">
+              {error}
+            </div>
+          )}
+          <p className="mb-4 text-xs text-ink-500">
+            Creates a pending salary record for every active staff member using each person's saved basic salary.
+            Staff who already have a record for this period are skipped.
+          </p>
+
+          <Field label="Period" required>
+            <TextInput
+              required
+              placeholder="e.g. 2026-01"
+              value={form.period}
+              onChange={(e) => setForm({ ...form, period: e.target.value })}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Bonus for each staff member">
+              <TextInput
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.bonuses}
+                onChange={(e) => setForm({ ...form, bonuses: e.target.value })}
+              />
+            </Field>
+            <Field label="Deduction for each staff member">
+              <TextInput
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.deductions}
+                onChange={(e) => setForm({ ...form, deductions: e.target.value })}
+              />
+            </Field>
+          </div>
+
+          <Field label="Notes">
+            <TextArea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </Field>
+
+          <div className="flex justify-end gap-2 mt-2">
+            <Button type="button" variant="ghost" onClick={handleClose}>Cancel</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Generating…" : "Generate salaries"}</Button>
+          </div>
+        </form>
+      ) : (
+        <div>
+          <div className="mb-4 grid grid-cols-2 gap-3">
+            <div className="rounded-md border border-moss-600/30 bg-moss-100 px-3 py-3 text-center">
+              <div className="font-tabular text-2xl text-moss-600">{result.createdCount}</div>
+              <div className="text-xs text-moss-600">created</div>
+            </div>
+            <div className="rounded-md border border-ink-200 bg-paper-100 px-3 py-3 text-center">
+              <div className="font-tabular text-2xl text-ink-700">{result.skippedCount}</div>
+              <div className="text-xs text-ink-600">skipped</div>
+            </div>
+          </div>
+          {result.skipped?.length > 0 && (
+            <div className="mb-4 max-h-40 overflow-y-auto rounded-md border border-ink-100">
+              {result.skipped.map((item) => (
+                <div key={item.staff} className="border-b border-ink-100 px-3 py-2 text-xs last:border-0">
+                  <span className="font-medium text-ink-800">{item.fullName}</span>
+                  <span className="text-ink-500"> — {item.reason}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end"><Button onClick={handleClose}>Done</Button></div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

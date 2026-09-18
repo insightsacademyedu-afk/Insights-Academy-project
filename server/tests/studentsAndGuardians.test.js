@@ -2,6 +2,7 @@ import app from "../app.js";
 import Guardian from "../models/Guardian.js";
 import Student from "../models/Student.js";
 import StudentClassAssignment from "../models/StudentClassAssignment.js";
+import Section from "../models/Section.js";
 import FeeInvoice from "../models/FeeInvoice.js";
 import { createAdminSession, createTeacherSession, withCsrf } from "./helpers/authHelpers.js";
 import { createAcademicChain } from "./helpers/fixtures.js";
@@ -38,13 +39,15 @@ describe("Phase 4 — Student & Guardian management", () => {
     expect(res.body.student).toBeTruthy();
     expect(res.body.guardian).toBeTruthy();
     expect(res.body.assignment).toBeTruthy();
+    expect(res.body.student.admissionNumber).toBe("0001");
+    expect(res.body.assignment.rollNumber).toBe("1");
 
     expect(await Guardian.countDocuments({})).toBe(1);
     expect(await Student.countDocuments({})).toBe(1);
     expect(await StudentClassAssignment.countDocuments({})).toBe(1);
   });
 
-  test("a duplicate roll number in the same class/section/session fails with 409, and leaves NO partial records behind", async () => {
+  test("admission and roll numbers increment automatically", async () => {
     const { agent, csrfToken } = await createAdminSession(app);
     const { klass, section, session } = await createAcademicChain();
 
@@ -54,13 +57,88 @@ describe("Phase 4 — Student & Guardian management", () => {
 
     const second = studentPayload({ classId: klass._id, sectionId: section._id, sessionId: session._id, rollNumber: "7" });
     const secondRes = await withCsrf(agent.post("/api/students").send(second), csrfToken);
-    expect(secondRes.status).toBe(409);
+    expect(secondRes.status).toBe(201);
+    expect(firstRes.body.student.admissionNumber).toBe("0001");
+    expect(secondRes.body.student.admissionNumber).toBe("0002");
+    expect(firstRes.body.assignment.rollNumber).toBe("1");
+    expect(secondRes.body.assignment.rollNumber).toBe("2");
 
-    // The transaction must have rolled back completely: only the first
-    // student's guardian/student/assignment records should exist.
-    expect(await Guardian.countDocuments({})).toBe(1);
-    expect(await Student.countDocuments({})).toBe(1);
-    expect(await StudentClassAssignment.countDocuments({})).toBe(1);
+    const otherSection = await Section.create({ name: "B", class: klass._id });
+    const thirdRes = await withCsrf(
+      agent.post("/api/students").send(
+        studentPayload({
+          classId: klass._id,
+          sectionId: otherSection._id,
+          sessionId: session._id,
+        })
+      ),
+      csrfToken
+    );
+    expect(thirdRes.status).toBe(201);
+    expect(thirdRes.body.student.admissionNumber).toBe("0003");
+    expect(thirdRes.body.assignment.rollNumber).toBe("3");
+
+    const otherClass = await createAcademicChain({ className: "8th", sectionName: "A" });
+    const fourthRes = await withCsrf(
+      agent.post("/api/students").send(
+        studentPayload({
+          classId: otherClass.klass._id,
+          sectionId: otherClass.section._id,
+          sessionId: otherClass.session._id,
+        })
+      ),
+      csrfToken
+    );
+    expect(fourthRes.status).toBe(201);
+    expect(fourthRes.body.student.admissionNumber).toBe("0004");
+    expect(fourthRes.body.assignment.rollNumber).toBe("1");
+
+    expect(await Guardian.countDocuments({})).toBe(4);
+    expect(await Student.countDocuments({})).toBe(4);
+    expect(await StudentClassAssignment.countDocuments({})).toBe(4);
+  });
+
+  test("admin can filter students by class and section", async () => {
+    const { agent, csrfToken } = await createAdminSession(app);
+    const firstClass = await createAcademicChain({ className: "Class 1", sectionName: "A" });
+    const sectionB = await Section.create({ name: "B", class: firstClass.klass._id });
+    const secondClass = await createAcademicChain({ className: "Class 2", sectionName: "A" });
+
+    const first = await withCsrf(
+      agent.post("/api/students").send(studentPayload({
+        classId: firstClass.klass._id,
+        sectionId: firstClass.section._id,
+        sessionId: firstClass.session._id,
+      })),
+      csrfToken
+    );
+    const second = await withCsrf(
+      agent.post("/api/students").send(studentPayload({
+        classId: firstClass.klass._id,
+        sectionId: sectionB._id,
+        sessionId: firstClass.session._id,
+      })),
+      csrfToken
+    );
+    const outside = await withCsrf(
+      agent.post("/api/students").send(studentPayload({
+        classId: secondClass.klass._id,
+        sectionId: secondClass.section._id,
+        sessionId: secondClass.session._id,
+      })),
+      csrfToken
+    );
+
+    const classResult = await agent.get(`/api/students?class=${firstClass.klass._id}`);
+    expect(classResult.status).toBe(200);
+    expect(classResult.body.items.map((student) => student._id)).toEqual(
+      expect.arrayContaining([first.body.student._id, second.body.student._id])
+    );
+    expect(classResult.body.items.map((student) => student._id)).not.toContain(outside.body.student._id);
+
+    const sectionResult = await agent.get(`/api/students?class=${firstClass.klass._id}&section=${sectionB._id}`);
+    expect(sectionResult.status).toBe(200);
+    expect(sectionResult.body.items.map((student) => student._id)).toEqual([second.body.student._id]);
   });
 
   test("a teacher assigned to Class9/SectionA can list/view students there, and gets 403 on a student in Class10/SectionB (IDOR guard)", async () => {

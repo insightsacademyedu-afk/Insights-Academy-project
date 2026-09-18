@@ -86,20 +86,6 @@ export default function DashboardAdmin() {
             </Panel>
           </div>
 
-          {Object.keys(data.notifications || {}).length > 0 && (
-            <Panel title="Notification queue">
-              <div className="flex flex-wrap gap-3">
-                {Object.entries(data.notifications).map(([status, count]) => (
-                  <span
-                    key={status}
-                    className="rounded-md border border-ink-200 px-3 py-1.5 text-xs text-ink-700 capitalize"
-                  >
-                    {status}: <span className="font-tabular font-medium">{formatNumber(count)}</span>
-                  </span>
-                ))}
-              </div>
-            </Panel>
-          )}
         </div>
       )}
     </AppLayout>

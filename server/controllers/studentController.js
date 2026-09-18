@@ -4,6 +4,7 @@ import Guardian from "../models/Guardian.js";
 import StudentClassAssignment from "../models/StudentClassAssignment.js";
 import TestResult from "../models/TestResult.js";
 import FeeInvoice from "../models/FeeInvoice.js";
+import Sequence from "../models/Sequence.js";
 import { buildListQuery, paginatedResponse } from "../utils/listQuery.js";
 import { getTeacherClassSectionPairs, buildStudentAssignmentFilterFromPairs } from "../utils/teacherScope.js";
 
@@ -19,6 +20,36 @@ function shapeForRole(studentDoc, role) {
   return rest;
 }
 
+function numericMaximum(values) {
+  return values.reduce((highest, value) => {
+    const text = String(value || "").trim();
+    return /^\d+$/.test(text) ? Math.max(highest, Number(text)) : highest;
+  }, 0);
+}
+
+async function incrementSequence(key, baseline, session) {
+  const sequence = await Sequence.findOneAndUpdate(
+    { _id: key },
+    [{ $set: { value: { $add: [{ $max: [{ $ifNull: ["$value", 0] }, baseline] }, 1] } } }],
+    { upsert: true, new: true, session }
+  );
+  return sequence.value;
+}
+
+async function nextAdmissionNumber(session) {
+  const existing = await Student.find({}, { admissionNumber: 1 }).session(session).lean();
+  const baseline = Math.max(existing.length, numericMaximum(existing.map((student) => student.admissionNumber)));
+  return String(await incrementSequence("student-admission", baseline, session)).padStart(4, "0");
+}
+
+async function nextRollNumber({ class: classId }, session) {
+  const scope = { class: classId };
+  const existing = await StudentClassAssignment.find(scope, { rollNumber: 1 }).session(session).lean();
+  const baseline = Math.max(existing.length, numericMaximum(existing.map((assignment) => assignment.rollNumber)));
+  const key = `student-roll:${classId}`;
+  return String(await incrementSequence(key, baseline, session));
+}
+
 export async function list(req, res, next) {
   try {
     const { filter, page, limit, skip, sort } = buildListQuery(req.query, {
@@ -27,7 +58,20 @@ export async function list(req, res, next) {
     });
     filter.archivedAt = null;
 
+    const requestedAssignmentScope = {};
+    if (req.query.academicSession) requestedAssignmentScope.academicSession = req.query.academicSession;
+    if (req.query.class) requestedAssignmentScope.class = req.query.class;
+    if (req.query.section) requestedAssignmentScope.section = req.query.section;
+
     if (req.user.role === "admin") {
+      if (Object.keys(requestedAssignmentScope).length > 0) {
+        const studentIds = await StudentClassAssignment.find({
+          ...requestedAssignmentScope,
+          status: "active",
+          archivedAt: null,
+        }).distinct("student");
+        filter._id = { $in: studentIds };
+      }
       const [items, total] = await Promise.all([
         Student.find(filter).populate("guardian").sort(sort).skip(skip).limit(limit),
         Student.countDocuments(filter),
@@ -43,7 +87,7 @@ export async function list(req, res, next) {
     const pairs = await getTeacherClassSectionPairs(req.user.staffId, {
       academicSession: req.query.academicSession,
     });
-    const assignmentFilter = buildStudentAssignmentFilterFromPairs(pairs);
+    const assignmentFilter = buildStudentAssignmentFilterFromPairs(pairs, requestedAssignmentScope);
 
     const studentIds = await StudentClassAssignment.find(assignmentFilter).distinct("student");
     const scopedFilter = { ...filter, archivedAt: null, _id: { $in: studentIds } };
@@ -87,28 +131,31 @@ export async function getOne(req, res, next) {
 // Full enrollment: creates Guardian + Student + initial StudentClassAssignment
 // together. Uses a transaction so a failure partway through (e.g. a
 // duplicate roll number) never leaves an orphaned Student or Guardian
-// record behind. Requires MongoDB running as a replica set — Atlas
+// record behind. Requires MongoDB running as a replica set — local MongoDB
 // clusters (including the free M0 tier) already are one; a bare local
 // standalone mongod is not, by default.
 export async function create(req, res, next) {
   let session;
   try {
     session = await mongoose.startSession();
-    const { guardian, enrollment, ...studentFields } = req.body;
+    const { guardian, enrollment, admissionNumber: _ignoredAdmissionNumber, ...studentFields } = req.body;
 
     if (!guardian) {
       return res.status(400).json({ message: "guardian details are required" });
     }
-    if (!enrollment || !enrollment.class || !enrollment.section || !enrollment.academicSession || !enrollment.rollNumber) {
-      return res.status(400).json({ message: "enrollment (class, section, academicSession, rollNumber) is required" });
+    if (!enrollment || !enrollment.class || !enrollment.section || !enrollment.academicSession) {
+      return res.status(400).json({ message: "enrollment (class, section and academicSession) is required" });
     }
 
     let result;
     await session.withTransaction(async () => {
       const [guardianDoc] = await Guardian.create([guardian], { session });
 
+      const admissionNumber = await nextAdmissionNumber(session);
+      const rollNumber = await nextRollNumber(enrollment, session);
+
       const [studentDoc] = await Student.create(
-        [{ ...studentFields, guardian: guardianDoc._id }],
+        [{ ...studentFields, admissionNumber, guardian: guardianDoc._id }],
         { session }
       );
 
@@ -119,7 +166,7 @@ export async function create(req, res, next) {
             class: enrollment.class,
             section: enrollment.section,
             academicSession: enrollment.academicSession,
-            rollNumber: enrollment.rollNumber,
+            rollNumber,
           },
         ],
         { session }
@@ -149,7 +196,7 @@ export async function create(req, res, next) {
 // there's always an explicit StudentClassAssignment record of the change.
 export async function update(req, res, next) {
   try {
-    const { guardian, enrollment, ...studentFields } = req.body;
+    const { guardian, enrollment, admissionNumber: _ignoredAdmissionNumber, ...studentFields } = req.body;
 
     let updated;
     await mongoose.connection.transaction(async session => {
@@ -185,20 +232,25 @@ export async function update(req, res, next) {
 // than overwriting history.
 export async function enroll(req, res, next) {
   try {
-    const { class: classId, section, academicSession, rollNumber } = req.body;
-    if (!classId || !section || !academicSession || !rollNumber) {
-      return res.status(400).json({ message: "class, section, academicSession and rollNumber are required" });
+    const { class: classId, section, academicSession } = req.body;
+    if (!classId || !section || !academicSession) {
+      return res.status(400).json({ message: "class, section and academicSession are required" });
     }
 
     const student = await Student.findOne({ _id: req.params.id, archivedAt: null });
     if (!student) return res.status(404).json({ message: "Not found" });
 
-    const assignment = await StudentClassAssignment.create({
-      student: student._id,
-      class: classId,
-      section,
-      academicSession,
-      rollNumber,
+    let assignment;
+    await mongoose.connection.transaction(async (session) => {
+      const rollNumber = await nextRollNumber({ class: classId, section, academicSession }, session);
+      const [created] = await StudentClassAssignment.create([{
+        student: student._id,
+        class: classId,
+        section,
+        academicSession,
+        rollNumber,
+      }], { session });
+      assignment = created;
     });
 
     res.status(201).json(assignment);
