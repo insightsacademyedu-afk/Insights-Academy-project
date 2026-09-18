@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
+
 export function Field({ label, error, children, required }) {
   return (
     <label className="block mb-4">
@@ -16,6 +19,30 @@ const baseInputClasses =
 
 export function TextInput(props) {
   return <input className={baseInputClasses} {...props} />;
+}
+
+export function PasswordInput({ className = "", ...props }) {
+  const [visible, setVisible] = useState(false);
+  const label = visible ? "Hide password" : "Show password";
+
+  return (
+    <span className="relative block">
+      <input
+        {...props}
+        type={visible ? "text" : "password"}
+        className={`${baseInputClasses} pr-10 ${className}`}
+      />
+      <button
+        type="button"
+        aria-label={label}
+        title={label}
+        onClick={() => setVisible((value) => !value)}
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-ink-500 hover:text-ink-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ink-700/20"
+      >
+        {visible ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+      </button>
+    </span>
+  );
 }
 
 export function TextArea(props) {

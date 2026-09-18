@@ -9,7 +9,7 @@ import StatusBadge from "../components/StatusBadge";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Button from "../components/Button";
-import { Field, TextInput, Select } from "../components/FormFields";
+import { Field, PasswordInput, TextInput, Select } from "../components/FormFields";
 import { staffApi } from "../api/staff";
 import { teacherAssignmentsApi } from "../api/teacherAssignments";
 import { designationsApi, academicSessionsApi, classesApi, sectionsApi, subjectsApi } from "../api/academicSetup";
@@ -428,8 +428,7 @@ function CreateLoginModal({ staff, onClose, onDone }) {
           />
         </Field>
         <Field label="Password" required>
-          <TextInput
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             placeholder="At least 8 characters"
@@ -480,8 +479,7 @@ function ResetPasswordModal({ staff, onClose }) {
           </div>
         )}
         <Field label="New password" required>
-          <TextInput
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             placeholder="At least 8 characters"

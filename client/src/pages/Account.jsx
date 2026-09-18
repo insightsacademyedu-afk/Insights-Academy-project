@@ -2,7 +2,7 @@ import { useState } from 'react';
 import AppLayout from '../components/AppLayout';
 import { changePassword } from '../api/auth';
 import Button from '../components/Button';
-import { Field, TextArea, TextInput } from '../components/FormFields';
+import { Field, PasswordInput, TextArea, TextInput } from '../components/FormFields';
 import * as backupsApi from '../api/backups';
 import { useAuth } from '../context/AuthContext';
 import { DEFAULT_ACADEMY_SETTINGS, useAcademy } from '../context/academy';
@@ -45,10 +45,10 @@ function PasswordSettings() {
       <form onSubmit={submit}>
         {Object.entries({ currentPassword: 'Current password', newPassword: 'New password', confirmPassword: 'Confirm new password' }).map(([key, label]) =>
           <label key={key} className="block mb-4 text-sm">{label}
-            <input type="password" required minLength={key === 'currentPassword' ? undefined : 12} maxLength={72}
+            <PasswordInput required minLength={key === 'currentPassword' ? undefined : 12} maxLength={72}
               autoComplete={key === 'currentPassword' ? 'current-password' : 'new-password'} disabled={saving}
               value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })}
-              className="mt-1 block w-full rounded-md border border-ink-200 px-3 py-2" />
+              className="mt-1" />
           </label>)}
         <button disabled={saving} className="rounded-md bg-ink-900 px-4 py-2 text-white disabled:opacity-60">{saving ? 'Changing password…' : 'Change password'}</button>
       </form>

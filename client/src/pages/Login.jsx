@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { PasswordInput } from "../components/FormFields";
 
 export default function Login() {
   const { login, status } = useAuth();
@@ -71,13 +72,11 @@ export default function Login() {
 
           <label className="block mb-6">
             <span className="block text-xs font-medium text-ink-600 mb-1.5">Password</span>
-            <input
-              type="password"
+            <PasswordInput
               autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-ink-200 bg-white px-3 py-2 text-sm text-ink-950 outline-none focus:border-ink-700 focus:ring-2 focus:ring-ink-700/10"
               placeholder="••••••••"
             />
           </label>

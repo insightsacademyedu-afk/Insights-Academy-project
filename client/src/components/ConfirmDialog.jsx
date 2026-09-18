@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Modal from "./Modal";
 import Button from "./Button";
-import { Field, TextArea, TextInput } from "./FormFields";
+import { Field, PasswordInput, TextArea } from "./FormFields";
 
 export default function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel = "Archive", busy }) {
   const [adminPassword, setAdminPassword] = useState("");
@@ -33,7 +33,7 @@ export default function ConfirmDialog({ open, onClose, onConfirm, title, message
             onChange={(event) => setReason(event.target.value)} placeholder="Why is this record being archived?" />
         </Field>
         <Field label="Current admin password" required>
-          <TextInput type="password" required maxLength={72} autoComplete="current-password"
+          <PasswordInput required maxLength={72} autoComplete="current-password"
             value={adminPassword} disabled={busy} onChange={(event) => setAdminPassword(event.target.value)} />
         </Field>
       </div>
