@@ -11,3 +11,5 @@ local-backups/
 *.archive.gz.json
 *.partial
 .connection-*/
+
+.vercel
