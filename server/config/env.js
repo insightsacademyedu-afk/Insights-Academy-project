@@ -63,6 +63,10 @@ export const config = {
     pass: process.env.SMTP_PASS || "",
     from: process.env.SMTP_FROM || "",
   },
+  resend: {
+    apiKey: process.env.RESEND_API_KEY || "",
+    from: process.env.RESEND_FROM || "",
+  },
 
   seedAdmin: {
     username: process.env.SEED_ADMIN_USERNAME || "admin",

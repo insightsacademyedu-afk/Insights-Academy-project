@@ -38,6 +38,8 @@ SMTP_SECURE=false
 SMTP_USER=<full Gmail address>
 SMTP_PASS=<16-character Google app password>
 SMTP_FROM=<full Gmail address>
+RESEND_API_KEY=<Resend API key>
+RESEND_FROM=Insights Academy <no-reply@your-verified-domain.example>
 ```
 
 Gmail password-reset email requires 2-Step Verification and a Google app
@@ -45,6 +47,13 @@ password. Keep the app password only in the hosting provider's environment
 settings; never commit it to this repository. On Render, save the variables
 with **Save and deploy**, and set `CLIENT_URL` to the exact public HTTPS origin
 without a trailing slash.
+
+Free Render services block Gmail's SMTP ports. For a free Render deployment,
+set `RESEND_API_KEY` and `RESEND_FROM`; the application will prefer Resend's
+HTTPS API and will use SMTP only when no Resend key is configured. The address
+in `RESEND_FROM` must use a domain verified in the Resend dashboard. For an
+initial same-account test only, Resend's onboarding sender can be used as
+`Academy Management <onboarding@resend.dev>`.
 
 The administrator's **Create & download backup** action downloads the complete `.academy-backup` file to the administrator's computer. Keep that downloaded file on a separate device or cloud drive. The server-side `local-backups` copy is only an extra convenience and must not be treated as durable storage on free or ephemeral hosting.
 
