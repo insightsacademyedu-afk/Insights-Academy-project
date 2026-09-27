@@ -36,6 +36,7 @@ const feePaymentSchema = new Schema(
 
 feePaymentSchema.index({ student: 1, paidAt: -1 });
 feePaymentSchema.index({ invoice: 1 });
+feePaymentSchema.index({ paidAt: -1 });
 
 // Same existence-check rationale as FeeInvoice -> student/academicSession.
 // recordPayment() in feeController already loads the invoice via

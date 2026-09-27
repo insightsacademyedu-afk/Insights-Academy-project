@@ -4,6 +4,14 @@ export function login(username, password) {
   return api.post("/auth/login", { username, password }).then((r) => r.data.user);
 }
 
+export function requestPasswordReset(email) {
+  return api.post("/auth/request-password-reset", { email }).then((r) => r.data);
+}
+
+export function resetPassword(values) {
+  return api.post("/auth/reset-password", values).then((r) => r.data);
+}
+
 export function logout() {
   return api.post("/auth/logout").then((r) => r.data);
 }

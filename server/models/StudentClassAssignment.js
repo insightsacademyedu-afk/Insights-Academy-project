@@ -57,6 +57,8 @@ studentClassAssignmentSchema.index(
 // Fast lookups for "which students are in this class/section" (used by
 // the teacher-scoped student list).
 studentClassAssignmentSchema.index({ class: 1, section: 1, academicSession: 1 });
+studentClassAssignmentSchema.index({ class: 1, section: 1, academicSession: 1, status: 1, archivedAt: 1 });
+studentClassAssignmentSchema.index({ student: 1, status: 1, archivedAt: 1, createdAt: -1 });
 
 studentClassAssignmentSchema.pre("validate", async function (next) {
   try {

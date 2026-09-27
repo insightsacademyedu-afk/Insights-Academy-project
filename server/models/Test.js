@@ -74,6 +74,7 @@ testSchema.pre("validate", async function (next) {
 });
 
 testSchema.index({ class: 1, section: 1, subject: 1, academicSession: 1 });
+testSchema.index({ createdBy: 1, archivedAt: 1, status: 1 });
 
 testSchema.plugin(finiteNumbers);
 export default mongoose.model("Test", testSchema);

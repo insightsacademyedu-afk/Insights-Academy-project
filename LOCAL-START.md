@@ -1,6 +1,8 @@
 # Running this local copy
 
-Double-click `start-local.cmd`. The app builds an optimized local copy, starts one server window, and opens `http://127.0.0.1:5000`.
+Double-click `start-local.cmd`. It opens separate backend and frontend windows, starts the development app, and opens `http://localhost:5173`.
+
+The backend runs at `http://127.0.0.1:5000` and the Vite frontend runs at `http://localhost:5173`. Stop either window with `Ctrl+C` when finished. The optimized one-server launcher remains available through `start-local.ps1`.
 
 ## One-click startup on Windows
 

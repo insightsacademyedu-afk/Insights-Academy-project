@@ -43,6 +43,9 @@ staffSchema.pre("validate", async function () {
   if (this.designation && this.isModified("designation") && !await Designation.exists({ _id: this.designation, archivedAt: null })) throw validationError("Referenced designation does not exist");
 });
 
+staffSchema.index({ archivedAt: 1, createdAt: -1 });
+staffSchema.index({ archivedAt: 1, status: 1 });
+
 staffSchema.plugin(finiteNumbers);
 moneyFields(staffSchema,["basicSalary"]);
 export default mongoose.model("Staff", staffSchema);

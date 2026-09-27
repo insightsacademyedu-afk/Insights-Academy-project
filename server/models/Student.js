@@ -64,6 +64,8 @@ studentSchema.virtual("totalPayable").get(function () {
 studentSchema.set("toJSON", { virtuals: true });
 
 studentSchema.index({ fullName: "text", admissionNumber: "text" });
+studentSchema.index({ archivedAt: 1, createdAt: -1 });
+studentSchema.index({ archivedAt: 1, status: 1 });
 
 studentSchema.plugin(finiteNumbers);
 export default mongoose.model("Student", studentSchema);

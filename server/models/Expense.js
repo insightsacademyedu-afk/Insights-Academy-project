@@ -24,6 +24,7 @@ const expenseSchema = new Schema(
 );
 
 expenseSchema.index({ category: 1, expenseDate: -1 });
+expenseSchema.index({ archivedAt: 1, expenseDate: -1 });
 expenseSchema.index({ sourceSalaryPayment: 1 }, { unique: true, partialFilterExpression: { sourceSalaryPayment: { $type: "objectId" } } });
 
 // `category` is client-settable directly via the generic CRUD factory

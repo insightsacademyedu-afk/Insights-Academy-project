@@ -55,6 +55,14 @@ export const config = {
 
   loginMaxAttempts: Number(process.env.LOGIN_MAX_ATTEMPTS) || 5,
   loginLockoutMinutes: Number(process.env.LOGIN_LOCKOUT_MINUTES) || 15,
+  smtp: {
+    host: process.env.SMTP_HOST || "",
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === "true",
+    user: process.env.SMTP_USER || "",
+    pass: process.env.SMTP_PASS || "",
+    from: process.env.SMTP_FROM || "",
+  },
 
   seedAdmin: {
     username: process.env.SEED_ADMIN_USERNAME || "admin",

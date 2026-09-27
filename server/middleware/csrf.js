@@ -17,7 +17,7 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 // Login has no pre-existing authenticated session to forge on behalf of,
 // so there is nothing for CSRF to protect there — the browser has no
 // httpOnly auth cookie yet. Every other state-changing route stays protected.
-const EXEMPT_PATHS = new Set(["/api/auth/login"]);
+const EXEMPT_PATHS = new Set(["/api/auth/login", "/api/auth/request-password-reset", "/api/auth/reset-password"]);
 
 export function issueCsrfCookie(req, res, next) {
   if (!req.cookies?.[CSRF_COOKIE]) {

@@ -32,7 +32,19 @@ CLIENT_URL=https://<your-live-domain>
 SEED_ADMIN_USERNAME=<initial admin username>
 SEED_ADMIN_EMAIL=<initial admin email>
 SEED_ADMIN_PASSWORD=<initial admin password>
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=<full Gmail address>
+SMTP_PASS=<16-character Google app password>
+SMTP_FROM=<full Gmail address>
 ```
+
+Gmail password-reset email requires 2-Step Verification and a Google app
+password. Keep the app password only in the hosting provider's environment
+settings; never commit it to this repository. On Render, save the variables
+with **Save and deploy**, and set `CLIENT_URL` to the exact public HTTPS origin
+without a trailing slash.
 
 The administrator's **Create & download backup** action downloads the complete `.academy-backup` file to the administrator's computer. Keep that downloaded file on a separate device or cloud drive. The server-side `local-backups` copy is only an extra convenience and must not be treated as durable storage on free or ephemeral hosting.
 

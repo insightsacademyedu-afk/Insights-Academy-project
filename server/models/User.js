@@ -62,6 +62,10 @@ const userSchema = new Schema(
     tokenVersion: { type: Number, default: 0 },
 
     lastLogin: { type: Date, default: null },
+
+    passwordResetTokenHash: { type: String, default: null, select: false },
+    passwordResetExpiresAt: { type: Date, default: null, select: false },
+    passwordResetAttempts: { type: Number, default: 0, select: false },
   },
   { timestamps: true } // adds createdAt / updatedAt
 );

@@ -1,8 +1,16 @@
 import { config } from "../config/env.js";
 import User from "../models/User.js";
 import { signToken, getCookieOptions } from "../utils/token.js";
+import { createHash, randomInt } from "node:crypto";
+import { sendPasswordResetCode } from "../services/email.js";
 
 const GENERIC_LOGIN_ERROR = "Invalid username or password";
+const RESET_CODE_TTL_MS = 10 * 60 * 1000;
+const MAX_RESET_ATTEMPTS = 5;
+
+function hashResetCode(code) {
+  return createHash("sha256").update(code).digest("hex");
+}
 
 export async function login(req, res, next) {
   try {
@@ -62,6 +70,65 @@ export async function login(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+export async function requestPasswordReset(req, res, next) {
+  try {
+    const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
+    if (!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({ message: "Enter a valid account email address." });
+
+    const user = await User.findOne({ email, status: "active" }).select("+passwordResetTokenHash +passwordResetExpiresAt +passwordResetAttempts");
+    if (user) {
+      const code = String(randomInt(100000, 1000000));
+      user.passwordResetTokenHash = hashResetCode(code);
+      user.passwordResetExpiresAt = new Date(Date.now() + RESET_CODE_TTL_MS);
+      user.passwordResetAttempts = 0;
+      await user.save();
+      try {
+        await sendPasswordResetCode({ recipient: user.email, code });
+      } catch (error) {
+        console.error("[auth] password reset email failed:", error.message);
+      }
+    }
+
+    return res.json({ message: "If an active account uses that email, a reset code has been sent." });
+  } catch (error) { next(error); }
+}
+
+export async function resetPassword(req, res, next) {
+  try {
+    const { email, code, newPassword, confirmPassword } = req.body;
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail) || typeof code !== "string" || !/^\d{6}$/.test(code) ||
+        typeof newPassword !== "string" || newPassword.length < 12 || Buffer.byteLength(newPassword, "utf8") > 72) {
+      return res.status(400).json({ message: "Enter the email, six-digit code, and a new password of at least 12 characters." });
+    }
+    if (newPassword !== confirmPassword) return res.status(400).json({ message: "New passwords do not match." });
+
+    const user = await User.findOne({ email: normalizedEmail, status: "active" }).select("+passwordResetTokenHash +passwordResetExpiresAt +passwordResetAttempts");
+    if (!user || !user.passwordResetTokenHash || !user.passwordResetExpiresAt || user.passwordResetExpiresAt <= new Date()) {
+      return res.status(400).json({ message: "That reset code is invalid or expired." });
+    }
+    if (user.passwordResetAttempts >= MAX_RESET_ATTEMPTS) {
+      return res.status(400).json({ message: "Too many incorrect codes. Request a new reset code." });
+    }
+
+    user.passwordResetAttempts += 1;
+    if (hashResetCode(code) !== user.passwordResetTokenHash) {
+      await user.save();
+      return res.status(400).json({ message: "That reset code is invalid or expired." });
+    }
+
+    user.passwordHash = await User.hashPassword(newPassword);
+    user.passwordResetTokenHash = null;
+    user.passwordResetExpiresAt = null;
+    user.passwordResetAttempts = 0;
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    user.tokenVersion += 1;
+    await user.save();
+    return res.json({ message: "Password reset successfully. You can now sign in." });
+  } catch (error) { next(error); }
 }
 
 export async function logout(req, res) {

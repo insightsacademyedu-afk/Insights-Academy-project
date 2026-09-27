@@ -57,6 +57,7 @@ const feeInvoiceSchema = new Schema(
 feeInvoiceSchema.index({ student: 1, period: 1, invoiceType: 1 }, { unique: true });
 feeInvoiceSchema.index({ student: 1, status: 1 });
 feeInvoiceSchema.index({ academicSession: 1, status: 1 });
+feeInvoiceSchema.index({ status: 1, createdAt: -1 });
 
 // Mongoose's ObjectId type only validates the *shape* of student/
 // academicSession, not that the referenced document exists. Mirrors the
